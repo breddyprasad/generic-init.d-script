@@ -1,0 +1,88 @@
+#! /bin/sh
+### BEGIN INIT INFO
+# Short-Description: Example initscript
+# Description:       This file should be used to construct scripts to be
+#                    placed in /etc/init.d.
+### END INIT INFO
+# Author: Krishna Komarshetty <krishna@open2nix.com>
+# Date: 7.23.2016
+
+# PATH should only include /usr/* if it runs after the mountnfs.sh script
+PATH=/sbin:/usr/sbin:/bin:/usr/bin
+SRC=<path-to-application-jar>
+# check for source path
+if [ ! -d "$SRC" ]; then
+        echo "$SRC path does not exist"
+        exit 0
+fi
+cd $SRC
+mkdir -p $SRC/logs && touch $SRC/logs/sysout.log
+STACKTRACE=$SRC/logs/sysout.log
+JAR=<jar-file-name>*.jar
+CONFG=<path-to-application.conf> 
+LOGBACK=<path-to-logback.xml> 	#optional 
+HEAPSIZE="-Xms512m -Xmx1024m" 	#make changes bases on your application memory requirement
+NAME="generic-init.d-script" 	#name of init scipt
+SERVICE_NAME="java -jar $HEAPSIZE -Dconfig.file=$SRC/$CONFG -Dlogback.configurationFile=$SRC/$LOGBACK $SRC/$JAR > $STACKTRACE"
+PIDFILE=/var/run/$NAME.pid 
+SCRIPTNAME=/etc/init.d/$NAME
+
+# switch cases to start stop restart and status service script
+case $1 in
+    start)
+        echo "Starting $NAME $SERVICE_NAME ..."
+        if [ ! -f $PIDFILE ]; then
+	    $SERVICE_NAME &
+            echo $! > $PIDFILE && PID=$!
+            echo $PID "[ OK ]"
+        else
+	    PID=$(cat $PIDFILE);
+            echo "$NAME is already running $PID"
+        fi
+   ;;
+    stop)
+        if [ -f $PIDFILE ]; then
+            PID=$(cat $PIDFILE);
+            echo "$NAME stoping ..."
+            kill $PID;
+            echo "$PID killed !!!"
+            rm $PIDFILE
+        else
+            echo "$NAME is not running ..."
+        fi
+   ;;
+    restart)
+        if [ -f $PIDFILE ]; then
+            PID=$(cat $PIDFILE);
+            echo "$NAME stopping ...";
+            kill $PID;
+            echo "$PID killed !!!"
+            rm $PIDFILE
+            echo "starting again $SERVICE_NAME ..."
+            $SERVICE_NAME &
+            echo $! > $PIDFILE && PID=$!
+            echo $PID "[ OK ]"
+	else
+            echo "$NAME is not running ..."
+        fi
+    ;;
+    status)
+        if [ -f $PIDFILE ]; then
+            PID=$(cat $PIDFILE);
+	    sudo ps axf | grep $PID | grep -v grep
+	    if [ $? != 0 ]; then 
+		echo "$NAME $PID exists but process dead !!!"
+	    else
+		echo "$NAME is already running ..."
+	    fi
+	else
+	    echo "$NAME is not running ..."
+        fi
+    ;;
+    *)
+        echo "Usage: $SCRIPTNAME {start|stop|status|restart}" >&2
+        exit 3
+        ;;
+esac
+
+:
