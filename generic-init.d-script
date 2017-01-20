@@ -44,7 +44,7 @@ start(){
 stop(){
 	PIDP=`ps -A -o pid,cmd|grep $JAR|grep -v grep|head -n 1|awk '{print $1}' 2> /dev/null`
 	PID=$(cat $PIDFILE 2> /dev/null);
-	if [[ $PIDP == "" && $PID == "" ]]; then
+	if [ -z "$PIDP" ] && [ -z "$PID" ]; then
 		return 1
 	fi
 	echo "$NAME stoping ..."
