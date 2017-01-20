@@ -16,68 +16,94 @@ if [ ! -d "$SRC" ]; then
         exit 0
 fi
 cd $SRC
-mkdir -p $SRC/logs && touch $SRC/logs/sysout.log
-STACKTRACE=$SRC/logs/sysout.log
+mkdir -p logs && touch $SRC/logs/sysout.log
+STACKTRACE=logs/sysout.log
 JAR=<jar-file-name>*.jar
 CONFG=<path-to-application.conf> 
 LOGBACK=<path-to-logback.xml> 	#optional 
-HEAPSIZE="-Xms512m -Xmx1024m" 	#make changes bases on your application memory requirement
+HEAPSIZE="-Xms256m -Xmx512m" 	#make changes bases on your application memory requirement
 NAME="generic-init.d-script" 	#name of init scipt
-SERVICE_NAME="java -jar $HEAPSIZE -Dconfig.file=$SRC/$CONFG -Dlogback.configurationFile=$SRC/$LOGBACK $SRC/$JAR > $STACKTRACE"
-PIDFILE=/var/run/$NAME.pid 
+SERVICE_NAME="java -jar $HEAPSIZE -XX:-OmitStackTraceInFastThrow -Dconfig.file=$CONFG -Dlogback.configurationFile=$LOGBACK $JAR"
+PIDFILE=/var/run/$NAME.pid
 SCRIPTNAME=/etc/init.d/$NAME
+
+###function for starting process###
+start(){
+	echo "$NAME starting ..."
+	PID=`$SERVICE_NAME &> $STACKTRACE & echo $!` && echo $PID > $PIDFILE 
+	# Check if successfully started
+	if [ $? != 0 ]
+	then
+		echo "Error"
+		exit 1
+	else
+		echo "$PID STARTED"
+	fi
+}
+####function for stopping process###
+stop(){
+	PIDP=`ps -A -o pid,cmd|grep $JAR|grep -v grep|head -n 1|awk '{print $1}' 2> /dev/null`
+	PID=$(cat $PIDFILE 2> /dev/null);
+	if [[ $PIDP == "" && $PID == "" ]]; then
+		return 1
+	fi
+	echo "$NAME stoping ..."
+	kill -9 $PID 2> /dev/null
+	if [ $? != 0 ]; then
+		kill -9 $PIDP 2> /dev/null
+		echo "$PIDP KILLED"
+	else
+		echo "$PID KILLED"
+	fi
+	rm $PIDFILE 2> /dev/null
+}
+###function for process status check####
+status(){
+	PID=$(cat $PIDFILE 2> /dev/null);
+	if [ $? != 0 ]; then
+		ps -aux | grep $JAR | grep -v grep 2> /dev/null
+		if [ $? != 0 ]; then
+			return 1		
+		fi
+	else
+		ps -axf | grep $PID | grep -v grep 2> /dev/null
+		if [ $? != 0 ]; then
+			return 1
+		else
+			return 0
+		fi
+	fi
+}
 
 # switch cases to start stop restart and status service script
 case $1 in
     start)
-        echo "Starting $NAME $SERVICE_NAME ..."
-        if [ ! -f $PIDFILE ]; then
-	    $SERVICE_NAME &
-            echo $! > $PIDFILE && PID=$!
-            echo $PID "[ OK ]"
-        else
-	    PID=$(cat $PIDFILE);
-            echo "$NAME is already running $PID"
-        fi
+	status
+	if [ $? != 0 ]; then 
+        	start
+	else
+		echo "$NAME is already running ..."
+	fi
    ;;
     stop)
-        if [ -f $PIDFILE ]; then
-            PID=$(cat $PIDFILE);
-            echo "$NAME stoping ..."
-            kill $PID;
-            echo "$PID killed !!!"
-            rm $PIDFILE
-        else
-            echo "$NAME is not running ..."
-        fi
+	status
+	if [ $? != 1 ]; then 
+		stop
+	else
+		echo "$NAME is not running !!!" 
+	fi
    ;;
     restart)
-        if [ -f $PIDFILE ]; then
-            PID=$(cat $PIDFILE);
-            echo "$NAME stopping ...";
-            kill $PID;
-            echo "$PID killed !!!"
-            rm $PIDFILE
-            echo "starting again $SERVICE_NAME ..."
-            $SERVICE_NAME &
-            echo $! > $PIDFILE && PID=$!
-            echo $PID "[ OK ]"
-	else
-            echo "$NAME is not running ..."
-        fi
+	stop
+	start
     ;;
     status)
-        if [ -f $PIDFILE ]; then
-            PID=$(cat $PIDFILE);
-	    sudo ps axf | grep $PID | grep -v grep
-	    if [ $? != 0 ]; then 
-		echo "$NAME $PID exists but process dead !!!"
-	    else
+	status
+	if [ $? == 0 ]; then 
 		echo "$NAME is already running ..."
-	    fi
-	else
-	    echo "$NAME is not running ..."
-        fi
+	else 
+		echo "$NAME is not running !!!"
+	fi 
     ;;
     *)
         echo "Usage: $SCRIPTNAME {start|stop|status|restart}" >&2
