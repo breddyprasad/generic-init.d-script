@@ -16,7 +16,7 @@ if [ ! -d "$SRC" ]; then
         exit 0
 fi
 cd $SRC
-mkdir -p logs && touch $SRC/logs/sysout.log
+mkdir -p logs && touch logs/sysout.log
 STACKTRACE=logs/sysout.log
 JAR=<jar-file-name>*.jar
 CONFG=<path-to-application.conf> 
@@ -30,7 +30,7 @@ SCRIPTNAME=/etc/init.d/$NAME
 ###function for starting process###
 start(){
 	echo "$NAME starting ..."
-	PID=`$SERVICE_NAME &> $STACKTRACE & echo $!` && echo $PID > $PIDFILE 
+	PID=`$SERVICE_NAME > $STACKTRACE & echo $!` && echo $PID > $PIDFILE 
 	# Check if successfully started
 	if [ $? != 0 ]
 	then
