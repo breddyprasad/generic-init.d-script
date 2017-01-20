@@ -99,7 +99,7 @@ case $1 in
     ;;
     status)
 	status
-	if [ $? == 0 ]; then 
+	if [ $? != 1 ]; then 
 		echo "$NAME is already running ..."
 	else 
 		echo "$NAME is not running !!!"
